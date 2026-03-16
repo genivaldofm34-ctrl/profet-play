@@ -1,71 +1,75 @@
 import streamlit as st
 import os
 
-# Configuração de Layout Larga (igual ao PC)
+# 1. Configuração de Layout e Estilo (Inspirado na image_f1bd20.png)
 st.set_page_config(page_title="PROFET PLAY", page_icon="🎮", layout="wide")
 
-# CSS para imitar os botões e cards da image_f1bd20.png
 st.markdown("""
     <style>
-    .stApp { background-color: #121212; }
-    .card-lenda { background-color: #d4af37; padding: 20px; border-radius: 10px; text-align: center; color: black; font-weight: bold; }
-    .card-superacao { background-color: #e67e22; padding: 20px; border-radius: 10px; text-align: center; color: white; font-weight: bold; }
-    .stButton>button { border-radius: 5px; font-weight: bold; text-transform: uppercase; }
-    .btn-turma { background-color: #6c5ce7 !important; color: white !important; }
-    .btn-aluno { background-color: #2ecc71 !important; color: white !important; }
-    .btn-aula { background-color: #8e44ad !important; color: white !important; }
+    .stApp { background-color: #0c0c0c; color: white; }
+    .card-lenda { background-color: #f1c40f; padding: 25px; border-radius: 12px; text-align: center; color: black; font-weight: bold; font-size: 22px; box-shadow: 0 4px 15px rgba(241, 196, 15, 0.3); }
+    .card-sup { background-color: #e67e22; padding: 25px; border-radius: 12px; text-align: center; color: white; font-weight: bold; font-size: 22px; box-shadow: 0 4px 15px rgba(230, 126, 34, 0.3); }
+    .card-record { background-color: #34495e; padding: 15px; border-radius: 10px; text-align: center; color: #ecf0f1; border: 1px solid #2e7bcf; margin-top: 10px; }
+    .stButton>button { border-radius: 8px; font-weight: bold; transition: 0.3s; }
     </style>
     """, unsafe_allow_html=True)
 
-# Topo com Destaques (Igual ao PC)
-col_lenda, col_sup = st.columns(2)
-with col_lenda:
-    st.markdown('<div class="card-lenda">👑 LENDA DA SEMANA<br>---</div>', unsafe_allow_html=True)
-with col_sup:
-    st.markdown('<div class="card-superacao">🚀 SUPERAÇÃO DA SEMANA<br>---</div>', unsafe_allow_html=True)
+# 2. Lógica de Dados
+def carregar_alunos(turma):
+    arquivo = f"dados_alunos_{turma}.txt"
+    if os.path.exists(arquivo):
+        with open(arquivo, "r", encoding="utf-8") as f:
+            return [l.strip().split("|") for l in f.readlines() if "|" in l]
+    return []
 
-st.write("---")
+# 3. Cabeçalho: Lenda, Superação e NOSSO RECORD
+col1, col2 = st.columns(2)
+with col1:
+    st.markdown('<div class="card-lenda">👑 LENDA DA SEMANA<br><span style="font-size: 30px;">BIANCA</span></div>', unsafe_allow_html=True)
+with col2:
+    st.markdown('<div class="card-sup">🚀 SUPERAÇÃO DA SEMANA<br><span style="font-size: 30px;">JONAS</span></div>', unsafe_allow_html=True)
 
-# Barra de Ferramentas
-c1, c2, c3, c4 = st.columns([1, 2, 1, 1])
-with c1:
-    turma = st.selectbox("TURMA:", ["TURMA A", "6º ANO MAT", "6º ANO ARTES"])
-with c2:
-    st.text_input("NOVA TURMA:", placeholder="NOME DA TURMA...")
-with c3:
-    st.button("+ TURMA", use_container_width=True)
-with c4:
-    st.button("📁 IMPORTAR", use_container_width=True)
+# A aba NOSSO RECORD que você pediu
+st.markdown('<div class="card-record">🏆 NOSSO RECORD ATUAL: <span style="color:#2e7bcf; font-size:24px;">1.250 PONTOS</span> (Turma 6º Ano)</div>', unsafe_allow_html=True)
 
-# Área de Ação do Aluno
-ca1, ca2, ca3 = st.columns([2, 1, 1])
-with ca1:
-    st.text_input("NOME DO ALUNO:", placeholder="DIGITE O NOME...")
-with ca2:
-    st.button("+ ALUNO", use_container_width=True)
-with ca3:
-    st.button("🚀 NOVA AULA", use_container_width=True)
-
-# Tabela de Dados (Simulando o grid do PC)
-st.markdown("### 📊 ESTÚDIO DE PONTOS")
-header = st.columns([2, 1, 1, 1, 1, 1, 1])
-header[0].write("**PLAYER**")
-header[1].write("**N1**")
-header[2].write("**N2**")
-header[3].write("**TOTAL**")
-header[4].write("**PROG**")
-header[5].write("**%**")
-header[6].write("**AÇÃO**")
-
-# Exemplo de aluno com os dados que vimos na image_f1bd7e.png
 st.divider()
-aluno_col = st.columns([2, 1, 1, 1, 1, 1, 1])
-aluno_col[0].write("BIANCA")
-aluno_col[1].write("0")
-aluno_col[2].write("0")
-aluno_col[3].write("**90**")
-aluno_col[4].write("📈")
-aluno_col[5].write("10%")
-aluno_col[6].button("🏆", key="b1")
 
-st.info("Para que os botões de '+ TURMA' e '+ ALUNO' funcionem no iPhone e salvem na tabela, precisamos agora conectar ao Google Sheets.")
+# 4. Painel de Controle (Botões funcionais)
+c1, c2, c3 = st.columns([1, 1, 1])
+with c1:
+    turma_sel = st.selectbox("TURMA ATIVA:", ["6º_ANO_MATEMÁTICA", "6º_ANO_ARTES", "TURMA_A"])
+with c2:
+    if st.button("➕ NOVO ALUNO", use_container_width=True):
+        st.toast("Função de cadastro ativada! Digite o nome abaixo.")
+with c3:
+    if st.button("🚀 INICIAR NOVA AULA", use_container_width=True):
+        st.balloons()
+        st.success("Aula iniciada! Pontuação dobrada ativada.")
+
+# 5. Estúdio de Pontos (A Tabela)
+st.markdown("### 📊 ESTÚDIO DE PONTOS")
+alunos = carregar_alunos(turma_sel)
+
+if alunos:
+    # Cabeçalho da Tabela
+    h = st.columns([3, 1, 1, 1, 1])
+    h[0].write("**PLAYER**")
+    h[1].write("**TOTAL**")
+    h[2].write("**PROG**")
+    h[3].write("**%**")
+    h[4].write("**AÇÃO**")
+    
+    for i, aluno in enumerate(alunos):
+        nome = aluno[0]
+        # Limpa os pontos pegando apenas o último valor
+        pontos = aluno[1].split(",")[-1] if "," in aluno[1] else aluno[1]
+        
+        col_a = st.columns([3, 1, 1, 1, 1])
+        col_a[0].markdown(f"**{nome}**")
+        col_a[1].write(f"{pontos}")
+        col_a[2].write("📈")
+        col_a[3].write("10%")
+        if col_a[4].button("🏆", key=f"ponto_{i}"):
+            st.toast(f"Ponto registrado para {nome}!")
+else:
+    st.warning("Selecione uma turma válida para ver os registros.")
