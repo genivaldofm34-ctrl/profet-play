@@ -1,37 +1,40 @@
 import streamlit as st
 import os
 
-# Configuração visual e Modo Escuro por padrão
+# Configuração de "App de Luxo" para iPhone
 st.set_page_config(page_title="PROFET PLAY", page_icon="🎮", layout="centered")
 
-# Estilização CSS para deixar com cara de App Profissional
+# Estilo visual (Cores da sua marca)
 st.markdown("""
     <style>
-    .main { background-color: #0e1117; }
+    .stApp { background-color: #0e1117; color: white; }
     .stButton>button {
         width: 100%;
-        border-radius: 10px;
-        height: 3em;
-        background-color: #2e7bcf;
+        border-radius: 12px;
+        background: linear-gradient(135deg, #2e7bcf, #1a4b8c);
         color: white;
-        font-weight: bold;
-    }
-    h1 { color: #2e7bcf; text-align: center; }
-    .aluno-card {
+        border: none;
         padding: 10px;
-        border-radius: 10px;
+        font-weight: bold;
+        box-shadow: 0px 4px 10px rgba(0,0,0,0.3);
+    }
+    .aluno-box {
+        padding: 15px;
+        border-radius: 15px;
         background-color: #1e2630;
         margin-bottom: 10px;
         border: 1px solid #3e4a5b;
     }
+    h1, h2 { text-align: center; color: #2e7bcf; }
     </style>
     """, unsafe_allow_html=True)
 
 st.title("🎮 PROFET PLAY")
-st.write("---")
+st.subheader("Plataforma Mobile")
 
-def carregar_dados(turma):
-    arquivo = f"dados_alunos_{turma}.txt"
+def carregar_alunos():
+    # Ele vai tentar abrir o arquivo principal que vi na sua imagem
+    arquivo = "dados_alunos.txt"
     if os.path.exists(arquivo):
         with open(arquivo, "r", encoding="utf-8") as f:
             linhas = f.readlines()
@@ -40,30 +43,26 @@ def carregar_dados(turma):
                 if "|" in linha:
                     partes = linha.strip().split("|")
                     nome = partes[0]
-                    pontos = partes[-1]
-                    lista.append([nome, pontos])
+                    # Pega o último valor de pontos
+                    pontos = partes[-1].split(",")[-1] if "," in partes[-1] else partes[-1]
+                    lista.append({"nome": nome, "pontos": pontos})
             return lista
     return []
 
-# Menu de seleção bonito
-st.subheader("📁 Selecione sua Turma")
-turma_sel = st.selectbox("", ["6º_ANO_MATEMÁTICA", "6º_ANO_ARTES", "TURMA_A"], label_visibility="collapsed")
+# Interface
+st.markdown("### 👥 Lista de Alunos")
+alunos = carregar_alunos()
 
-if turma_sel:
-    alunos = carregar_dados(turma_sel)
-    if not alunos:
-        st.error(f"⚠️ O arquivo 'dados_alunos_{turma_sel}.txt' não foi encontrado no GitHub.")
-    else:
-        st.success(f"Turma: {turma_sel.replace('_', ' ')}")
-        for i, aluno in enumerate(alunos):
-            nome, pontos = aluno
-            # Criando um "card" para cada aluno
-            with st.container():
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.markdown(f"**{nome}**")
-                with col2:
-                    st.button(f"🏆 {pontos}", key=f"btn_{i}")
+if not alunos:
+    st.warning("⚠️ O arquivo 'dados_alunos.txt' ainda não foi lido corretamente.")
+else:
+    for i, aluno in enumerate(alunos):
+        with st.container():
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"**{aluno['nome']}**")
+            with col2:
+                st.button(f"🏆 {aluno['pontos']}", key=f"btn_{i}")
+        st.markdown("---")
 
-st.divider()
-st.caption("Acesse do Safari e 'Adicione à tela de início'")
+st.caption("Versão Professor - Use no Safari")
