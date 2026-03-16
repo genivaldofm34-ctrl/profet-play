@@ -1,41 +1,51 @@
 import streamlit as st
 import os
 
-# Configuração para o App parecer profissional no iPhone
-st.set_page_config(page_title="PROFET PLAY", page_icon="🎮", layout="centered")
+# Configuração para o iPhone
+st.set_page_config(page_title="PROFET PLAY", page_icon="🎮")
 
 st.title("🎮 PROFET PLAY")
 st.subheader("Painel do Professor")
 
-# Função para carregar os alunos dos seus arquivos .txt
 def carregar_dados(turma):
+    # Ajustei aqui para buscar o nome exato do arquivo que está no seu GitHub
     arquivo = f"dados_alunos_{turma}.txt"
+    
     if os.path.exists(arquivo):
         with open(arquivo, "r", encoding="utf-8") as f:
-            # Lógica para ler seus dados (ajustada para o seu formato)
             linhas = f.readlines()
             lista = []
             for linha in linhas:
-                partes = linha.strip().split("|")
-                if len(partes) >= 2:
-                    lista.append([partes[0], partes[1]])
+                if "|" in linha:
+                    partes = linha.strip().split("|")
+                    nome = partes[0]
+                    # Pega o último número da lista de pontos
+                    pontos = partes[-1].split(",")[-1] if "," in partes[-1] else partes[-1]
+                    lista.append([nome, pontos])
             return lista
     return []
 
-# Interface
-turma_sel = st.selectbox("Selecione a Turma", ["6º_ANO_MATEMÁTICA", "6º_ANO_ARTES", "TURMA_A"])
+# As turmas conforme aparecem nos seus arquivos .txt
+opcoes_turmas = [
+    "6º_ANO_MATEMÁTICA", 
+    "6º_ANO_ARTES", 
+    "TURMA_A"
+]
+
+turma_sel = st.selectbox("Selecione a Turma", opcoes_turmas)
 
 if turma_sel:
     alunos = carregar_dados(turma_sel)
     if not alunos:
-        st.warning("Nenhum dado encontrado. Verifique se os arquivos .txt estão no GitHub.")
+        st.error(f"Arquivo 'dados_alunos_{turma_sel}.txt' não encontrado no GitHub.")
     else:
         for i, aluno in enumerate(alunos):
             nome, pontos = aluno
-            col1, col2 = st.columns([2, 1])
+            col1, col2 = st.columns([3, 1])
             with col1:
-                st.write(f"**{nome}**")
+                st.write(f"👤 **{nome}**")
             with col2:
                 st.button(f"🏆 {pontos}", key=f"btn_{i}")
 
-st.info("Para dar pontos pelo celular, precisaremos conectar um banco de dados depois. Por enquanto, veja se os nomes aparecem!")
+st.divider()
+st.caption("PROFET PLAY v1.0 - Acesse do seu iPhone")
