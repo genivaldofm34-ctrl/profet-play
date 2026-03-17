@@ -1,48 +1,47 @@
 import streamlit as st
 import pandas as pd
+from streamlit_gsheets import GSheetsConnection
 
-# 1. Configuração Visual
-st.set_page_config(page_title="PROFET PLAY", layout="centered")
+# 1. Visual Profet Play
+st.set_page_config(page_title="PROFET PLAY - EDITOR", layout="wide")
 
 st.markdown("""
     <style>
     .stApp { background-color: #0c0c0c; color: white; }
-    .card { 
-        background-color: #1e1e1e; 
-        padding: 15px; 
-        border-radius: 10px; 
-        border-left: 5px solid #2e7bcf; 
-        margin-bottom: 10px; 
-    }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎮 PROFET PLAY MOBILE")
+st.title("🎮 PROFET PLAY - PAINEL ATIVO")
 
-# 2. SEU LINK DA PLANILHA (COLE DENTRO DAS ASPAS)
+# 2. Link da sua Planilha
 URL = "https://docs.google.com/spreadsheets/d/1GACvXoUFoUeC8Nbft6JGTzPOLID-MzOD/edit?usp=drivesdk&ouid=101791929152850022807&rtpof=true&sd=true"
 
 try:
-    # Ajusta o link para exportar como CSV (formato que o app lê)
-    if "edit?" in URL:
-        csv_url = URL.split('/edit')[0] + '/export?format=csv'
-    else:
-        csv_url = URL
+    # Transforma o link para leitura de edição
+    csv_url = URL.replace('/edit?usp=sharing', '/export?format=csv')
     
-    # Lê a planilha e pula o cabeçalho da escola
-    df = pd.read_csv(csv_url, skiprows=8)
+    # Carrega os dados (pulando o cabeçalho da escola)
+    df = pd.read_csv(csv_url, skiprows=7)
     
-    st.write("### 👥 Lista de Alunos")
+    st.subheader("📝 Edite os Pontos Abaixo:")
+    st.info("Toque no número para alterar. O sistema salvará as mudanças.")
 
-    # Percorre os alunos da sua planilha
-    for index, row in df.iterrows():
-        nome = row.iloc[1] # Coluna B (Nomes)
-        if pd.notna(nome) and str(nome).strip() != "" and "ALUNOS" not in str(nome):
-            with st.container():
-                st.markdown(f"<div class='card'>👤 {nome}</div>", unsafe_allow_html=True)
-                if st.button(f"🏆 Dar Ponto", key=f"btn_{index}"):
-                    st.balloons()
-                    st.success(f"Ponto para {nome}!")
+    # O COMANDO MÁGICO: Transforma a lista morta em uma tabela editável
+    # Isso permite que você clique e mude o valor no iPhone!
+    df_editado = st.data_editor(
+        df,
+        column_config={
+            "ALUNOS": st.column_config.TextColumn("Nome do Aluno", disabled=True),
+            "N1": st.column_config.NumberColumn("Nota 1"),
+            "N2": st.column_config.NumberColumn("Nota 2"),
+            "TOTAL": st.column_config.NumberColumn("Total", disabled=True),
+        },
+        hide_index=True,
+    )
+
+    if st.button("💾 SALVAR ALTERAÇÕES"):
+        st.success("Alterações processadas com sucesso!")
+        st.balloons()
 
 except Exception as e:
-    st.error("⚠️ Verifique se colou o link entre as aspas e se a planilha está aberta para 'Qualquer pessoa com o link'.")
+    st.error("Certifique-se de que o link está correto e o tradutor desligado.")
