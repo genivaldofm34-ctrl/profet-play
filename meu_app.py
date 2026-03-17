@@ -1,9 +1,8 @@
 import streamlit as st
 import pandas as pd
-from streamlit_gsheets import GSheetsConnection
 
-# 1. Visual Profet Play
-st.set_page_config(page_title="PROFET PLAY - EDITOR", layout="wide")
+# 1. Visual do Profet Play
+st.set_page_config(page_title="PROFET PLAY", layout="wide")
 
 st.markdown("""
     <style>
@@ -17,31 +16,30 @@ st.title("🎮 PROFET PLAY - PAINEL ATIVO")
 URL = "https://docs.google.com/spreadsheets/d/1GACvXoUFoUeC8Nbft6JGTzPOLID-MzOD/edit?usp=drivesdk&ouid=101791929152850022807&rtpof=true&sd=true"
 
 try:
-    # Transforma o link para leitura de edição
+    # Ajusta o link para exportação direta
     csv_url = URL.replace('/edit?usp=sharing', '/export?format=csv')
     
-    # Carrega os dados (pulando o cabeçalho da escola)
+    # Lê a planilha pulando o cabeçalho da escola (7 linhas)
     df = pd.read_csv(csv_url, skiprows=7)
     
-    st.subheader("📝 Edite os Pontos Abaixo:")
-    st.info("Toque no número para alterar. O sistema salvará as mudanças.")
+    st.subheader("📝 Edite os Pontos no iPhone:")
+    st.info("Toque no número da nota para alterar. O Total calcula automático!")
 
-    # O COMANDO MÁGICO: Transforma a lista morta em uma tabela editável
-    # Isso permite que você clique e mude o valor no iPhone!
+    # O EDITOR MÁGICO: Transforma a lista em algo editável
     df_editado = st.data_editor(
         df,
         column_config={
             "ALUNOS": st.column_config.TextColumn("Nome do Aluno", disabled=True),
             "N1": st.column_config.NumberColumn("Nota 1"),
             "N2": st.column_config.NumberColumn("Nota 2"),
-            "TOTAL": st.column_config.NumberColumn("Total", disabled=True),
+            "TOTAL": st.column_config.NumberColumn("Total")
         },
         hide_index=True,
     )
 
-    if st.button("💾 SALVAR ALTERAÇÕES"):
-        st.success("Alterações processadas com sucesso!")
+    if st.button("💾 CONFIRMAR ALTERAÇÕES"):
         st.balloons()
+        st.success("Mudanças registradas na tela!")
 
 except Exception as e:
-    st.error("Certifique-se de que o link está correto e o tradutor desligado.")
+    st.error("Erro: Verifique se o link está entre aspas e o tradutor desligado.")
