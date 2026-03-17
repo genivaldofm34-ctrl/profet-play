@@ -1,54 +1,48 @@
 import streamlit as st
 import pandas as pd
 
-# 1. Estilo Profet Play (Igual ao seu PC)
+# 1. Configuração Visual
 st.set_page_config(page_title="PROFET PLAY", layout="centered")
 
 st.markdown("""
     <style>
     .stApp { background-color: #0c0c0c; color: white; }
-    .card-aluno { 
+    .card { 
         background-color: #1e1e1e; 
         padding: 15px; 
         border-radius: 10px; 
-        border-left: 5px solid #2e7bcf;
-        margin-bottom: 10px;
-        font-weight: bold;
+        border-left: 5px solid #2e7bcf; 
+        margin-bottom: 10px; 
     }
-    .stButton>button { width: 100%; background-color: #2e7bcf; color: white; font-weight: bold; }
     </style>
     """, unsafe_allow_html=True)
 
-# 2. Link da sua Planilha (https://docs.google.com/spreadsheets/d/1GACvXoUFoUeC8Nbft6JGTzPOLID-MzOD/edit?usp=drivesdk&ouid=101791929152850022807&rtpof=true&sd=true"
-
 st.title("🎮 PROFET PLAY MOBILE")
 
+# 2. SEU LINK DA PLANILHA (COLE DENTRO DAS ASPAS)
+URL = "https://docs.google.com/spreadsheets/d/1GACvXoUFoUeC8Nbft6JGTzPOLID-MzOD/edit?usp=drivesdk&ouid=101791929152850022807&rtpof=true&sd=true"
+
 try:
-    # Transforma o link da planilha para formato de leitura rápida
+    # Ajusta o link para exportar como CSV (formato que o app lê)
     if "edit?" in URL:
-        csv_url = URL.split('/edit')[0] + '/gviz/tq?tqx=out:csv'
+        csv_url = URL.split('/edit')[0] + '/export?format=csv'
     else:
         csv_url = URL
-
-    # Lê os dados
-    df = pd.read_csv(csv_url)
     
-    st.markdown("### 👥 Lista de Alunos Ativa")
+    # Lê a planilha e pula o cabeçalho da escola
+    df = pd.read_csv(csv_url, skiprows=8)
+    
+    st.write("### 👥 Lista de Alunos")
 
-    # Na sua foto, os nomes estão na Coluna B (índice 1 no Python)
-    # E começam pra valer depois da linha 8
+    # Percorre os alunos da sua planilha
     for index, row in df.iterrows():
-        if index >= 7:  # Ajuste para pular o cabeçalho da escola
-            nome = row.iloc[1] # Coluna B
-            pontos = row.iloc[3] # Coluna D (Total)
-            
-            if pd.notna(nome) and str(nome).strip() != "":
-                with st.container():
-                    col1, col2 = st.columns([3, 1])
-                    col1.markdown(f"<div class='card-aluno'>{nome}</div>", unsafe_allow_html=True)
-                    if col2.button(f"🏆 {pontos}", key=f"btn_{index}"):
-                        st.balloons()
-                        st.toast(f"Ponto registrado para {nome}!")
+        nome = row.iloc[1] # Coluna B (Nomes)
+        if pd.notna(nome) and str(nome).strip() != "" and "ALUNOS" not in str(nome):
+            with st.container():
+                st.markdown(f"<div class='card'>👤 {nome}</div>", unsafe_allow_html=True)
+                if st.button(f"🏆 Dar Ponto", key=f"btn_{index}"):
+                    st.balloons()
+                    st.success(f"Ponto para {nome}!")
 
 except Exception as e:
-    st.error("⚠️ Erro na conexão. Verifique se o link da planilha foi colado corretamente e se o tradutor está desligado.")
+    st.error("⚠️ Verifique se colou o link entre as aspas e se a planilha está aberta para 'Qualquer pessoa com o link'.")
