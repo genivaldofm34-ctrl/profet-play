@@ -9,46 +9,47 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Leitura e Limpeza
+    # 1. Leitura
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
     df = df.fillna(0)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
+    # Limpa nomes
     if "ALUNOS" in df.columns:
         df["ALUNOS"] = df["ALUNOS"].astype(str).replace(["0", "0.0", "None"], "")
 
-    st.subheader("📋 1. Lance as Notas Abaixo")
-    # O editor serve apenas para entrada de dados
-    df_editado = st.data_editor(df, use_container_width=True, hide_index=True)
+    # 2. Uso de FORM para garantir que os dados sejam processados
+    with st.form("meu_formulario"):
+        st.subheader("📋 1. Lance as Notas e Aperte 'CALCULAR'")
+        df_editado = st.data_editor(df, use_container_width=True, hide_index=True)
+        
+        botao_calcular = st.form_submit_button("🧮 CALCULAR SOMA E VER RANKING")
 
-    # --- CÁLCULO MANUAL FORÇADO ---
-    # Identificamos as colunas de missões (que não são nomes nem totais)
-    cols_ignorar = ["ALUNOS", "TOTAL (XP)", "TOTAL", "ANTERIOR", "DIFERENÇA"]
-    cols_missoes = [c for c in df_editado.columns if c not in cols_ignorar]
+    # 3. O Cálculo só acontece se o botão for clicado
+    if botao_calcular:
+        # Identifica colunas de notas
+        cols_ignorar = ["ALUNOS", "TOTAL (XP)", "TOTAL", "ANTERIOR", "DIFERENÇA"]
+        cols_missoes = [c for c in df_editado.columns if c not in cols_ignorar]
 
-    # Convertendo tudo para número para garantir a conta
-    for col in cols_missoes:
-        df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
+        # Converte e Soma
+        for col in cols_missoes:
+            df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
+        
+        # Faz a soma real
+        df_editado["TOTAL (XP)"] = df_editado[cols_missoes].sum(axis=1)
 
-    # Calculando a soma
-    df_editado["TOTAL (XP)"] = df_editado[cols_missoes].sum(axis=1)
+        st.success("✅ Soma calculada com sucesso!")
+        
+        # Mostra o Ranking para conferir
+        st.subheader("🏆 Ranking Atualizado")
+        ranking = df_editado[["ALUNOS", "TOTAL (XP)"]].sort_values(by="TOTAL (XP)", ascending=False)
+        st.dataframe(ranking, use_container_width=True, hide_index=True)
 
-    st.divider()
-    st.subheader("📊 2. Confira a Soma e o Ranking")
-    
-    # Criamos uma tabela de conferência que mostra o nome e o total calculado
-    conferencia = df_editado[["ALUNOS", "TOTAL (XP)"]].copy()
-    conferencia = conferencia.sort_values(by="TOTAL (XP)", ascending=False)
-    
-    # EXIBE A SOMA AQUI (Se aqui estiver somando, o problema está resolvido!)
-    st.dataframe(conferencia, use_container_width=True, hide_index=True)
-
-    if st.button("💾 3. SALVAR TUDO NA PLANILHA"):
-        # Garante que a coluna de texto não vá com zeros
-        df_editado["ALUNOS"] = df_editado["ALUNOS"].replace("0", "")
-        conn.update(spreadsheet=url, data=df_editado)
-        st.success("Dados enviados com sucesso!")
-        st.balloons()
+        # Botão para salvar de verdade no Google
+        if st.button("💾 SALVAR DEFINITIVAMENTE NO GOOGLE"):
+            conn.update(spreadsheet=url, data=df_editado)
+            st.success("Planilha atualizada!")
+            st.balloons()
 
 except Exception as e:
-    st.error(f"Erro no sistema: {e}")
+    st.error(f"Erro: {e}")
