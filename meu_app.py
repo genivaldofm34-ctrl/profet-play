@@ -9,18 +9,23 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # Lendo os dados e limpando valores nulos para evitar erros de edição
+    # Lendo os dados
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
-    df = df.fillna("") # Preenche espaços vazios para permitir escrita
+    df = df.fillna("")
+    
+    # --- AQUI APAGAMOS A PRIMEIRA COLUNA ---
+    # Se a primeira coluna estiver vindo com o nome "Unnamed: 0" ou similar, nós a removemos:
+    if "Unnamed: 0" in df.columns:
+        df = df.drop(columns=["Unnamed: 0"])
     
     st.subheader("📋 Painel de Edição")
     
-    # FORÇANDO A EDIÇÃO:
-    # O parâmetro 'disabled=False' garante que nada seja bloqueado
+    # Exibindo o editor sem a coluna de índice lateral (hide_index=True)
     df_editado = st.data_editor(
         df, 
         use_container_width=True,
-        num_rows="dynamic"
+        num_rows="dynamic",
+        hide_index=True  # Isso remove os números 0, 1, 2 da lateral esquerda
     )
 
     if st.button("💾 SALVAR ALTERAÇÕES"):
