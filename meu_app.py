@@ -13,19 +13,22 @@ try:
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
     df = df.fillna("")
     
-    # --- AQUI APAGAMOS A PRIMEIRA COLUNA ---
-    # Se a primeira coluna estiver vindo com o nome "Unnamed: 0" ou similar, nós a removemos:
-    if "Unnamed: 0" in df.columns:
-        df = df.drop(columns=["Unnamed: 0"])
+    # --- LIMPANDO AS COLUNAS ---
+    # 1. Remove colunas fantasmas (Unnamed)
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    
+    # 2. APAGA A COLUNA "Número" que vem da planilha
+    if "Número" in df.columns:
+        df = df.drop(columns=["Número"])
     
     st.subheader("📋 Painel de Edição")
     
-    # Exibindo o editor sem a coluna de índice lateral (hide_index=True)
+    # Exibindo o editor limpo
     df_editado = st.data_editor(
         df, 
         use_container_width=True,
         num_rows="dynamic",
-        hide_index=True  # Isso remove os números 0, 1, 2 da lateral esquerda
+        hide_index=True 
     )
 
     if st.button("💾 SALVAR ALTERAÇÕES"):
