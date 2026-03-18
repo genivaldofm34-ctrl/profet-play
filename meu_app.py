@@ -11,7 +11,7 @@ url = "https://docs.google.com/spreadsheets/d/1GACvXoUFoUeC8Nbft6JGTzPOLID-MzOD/
 
 # Cria a conexão com o Google Sheets
 conn = st.connection("gsheets", type=GSheetsConnection)
-url = "https://docs.google.com/spreadsheets/d/1GACvXoUFoUeC8Nbft6JGTzPOLID-MzOD/edit"
+url = "url = "https://docs.google.com/spreadsheets/d/1wytV0LyDt5PXe-35T_X3zfsZKaXGKNaWlRWCEeZ_dlM/export?format=csv&gid=1926794755"
 df = conn.read(spreadsheet=url)
 try:
     # Lê os dados pulando as linhas iniciais se necessário
