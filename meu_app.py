@@ -9,54 +9,49 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Lê a planilha e força a limpeza de dados
-    df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')].copy()
-    
-    # Preenche vazios com 0 para evitar erro de sistema
-    df = df.fillna(0)
+    # 1. Busca os dados brutos
+    df_raw = conn.read(spreadsheet=url, skiprows=7, ttl=0)
+    df = df_raw.loc[:, ~df_raw.columns.str.contains('^Unnamed')].copy()
 
-    # 2. Mapeamento das colunas para o cadeado de segurança
-    cols = df.columns.tolist()
-    # Identificamos as colunas por nome ou posição
-    col_num = cols[0]   # Número
-    col_aluno = cols[1] # ALUNOS
-    col_total = cols[-1] # TOTAL (XP)
-    cols_notas = cols[2:-1] # Missões
+    # --- DESTRAVA OS TIPOS DE DADOS (Resolve o erro das imagens) ---
+    # Forçamos a coluna ALUNOS a aceitar texto (JJ, Nomes, etc)
+    if len(df.columns) > 1:
+        df.iloc[:, 1] = df.iloc[:, 1].astype(str).replace(["0", "0.0", "nan", "None"], "")
+    
+    # Forçamos as colunas de missões a serem numéricas
+    for c in df.columns[2:]:
+        df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
 
     st.subheader("📋 Painel de Lançamento")
 
-    # 3. O Editor com os tipos de dados corrigidos
+    # 2. O Editor com configuração manual (evita o conflito com o Sheets)
     df_editado = st.data_editor(
         df,
         use_container_width=True,
         hide_index=True,
         num_rows="dynamic",
         column_config={
-            col_num: st.column_config.NumberColumn("Nº", disabled=True),
-            col_aluno: st.column_config.TextColumn("ALUNOS", required=True),
-            col_total: st.column_config.NumberColumn("TOTAL (XP)", disabled=True),
-            # Todas as outras colunas são configuradas como NUMÉRICAS
-            **{c: st.column_config.NumberColumn(c, min_value=0) for c in cols_notas}
+            df.columns[0]: st.column_config.NumberColumn("Nº", disabled=True),
+            df.columns[1]: st.column_config.TextColumn("ALUNOS"), # ACEITA LETRAS AQUI
+            df.columns[-1]: st.column_config.NumberColumn("TOTAL (XP)", disabled=True)
         }
     )
 
-    # 4. Botão de Soma (L9+H9+G9...)
+    # 3. O Botão da Soma (L9+H9+G9...)
     st.divider()
     if st.button("🚀 CALCULAR E SALVAR"):
-        # Garante que as notas sejam números
-        for c in cols_notas:
-            df_editado[c] = pd.to_numeric(df_editado[c], errors='coerce').fillna(0)
+        cols = df_editado.columns.tolist()
+        # Soma tudo que está entre o Nome e o Total
+        missões = cols[2:-1]
         
-        # Faz a soma horizontal
-        df_editado[col_total] = df_editado[cols_notas].sum(axis=1)
+        # Faz a conta matemática
+        df_editado[cols[-1]] = df_editado[missões].sum(axis=1)
 
-        # Envia para o Google
+        # Salva no Google
         conn.update(spreadsheet=url, data=df_editado)
-        st.success("✅ Sistema Destravado! Dados salvos no Google Sheets.")
+        st.success("✅ Erro resolvido e dados salvos!")
         st.balloons()
         st.rerun()
 
 except Exception as e:
-    st.error(f"Erro técnico detectado: {e}")
-    st.info("Dica: Verifique se os nomes das colunas na Planilha são exatamente iguais aos do App.")
+    st.error(f"Erro técnico: {e}")
