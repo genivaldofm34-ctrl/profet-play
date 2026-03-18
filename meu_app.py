@@ -3,55 +3,96 @@ from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
 st.set_page_config(page_title="PROFET PLAY", layout="wide")
+
 st.title("🎮 PROFET PLAY - SISTEMA ATIVO")
 
-url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ04nRo6Dkufo/edit#gid=1926794755"
+# 🔗 ID da planilha (mais estável)
+SPREADSHEET_ID = "1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ04nRo6Dkufo"
+ABA = "FICHA_MODELO"
+
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Lendo os dados
-    df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
+    # 📥 CARREGAR DADOS
+    df = conn.read(
+        spreadsheet=SPREADSHEET_ID,
+        worksheet=ABA,
+        skiprows=7,
+        ttl=0
+    )
+
     df = df.fillna(0)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
-    # 2. Interface de Lançamento
-    st.subheader("📋 1. Lance as Notas")
-    df_editado = st.data_editor(df, use_container_width=True, hide_index=True)
+    st.subheader("📋 Lançamento de Pontos")
 
-    # --- A FÓRMULA AUTOMÁTICA ---
-    # Pegamos todas as colunas da tabela
+    # 🧠 Editor
+    df_editado = st.data_editor(
+        df,
+        use_container_width=True,
+        hide_index=True,
+        num_rows="dynamic"
+    )
+
+    # 🔁 FORÇAR CÓPIA (ESSENCIAL)
+    df_editado = df_editado.copy()
+
+    # 📊 IDENTIFICAR COLUNAS
     colunas = df_editado.columns.tolist()
-    
-    # Definimos que:
-    # A primeira coluna [0] é o Nome do Aluno
-    # A última coluna [-1] é o TOTAL (XP)
-    # As colunas do meio [1:-1] são todas as MISSÕES e o ANTERIOR
-    
     col_nome = colunas[0]
     col_total = colunas[-1]
     cols_para_somar = colunas[1:-1]
 
-    # Convertendo para número para garantir a conta
-    for col in cols_para_somar:
-        df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
-    
-    # EXECUTA A SOMA DAS LINHAS (Igual à sua fórmula do Excel)
+    # 🔢 CONVERTER PARA NÚMERO
+    df_editado[cols_para_somar] = df_editado[cols_para_somar].apply(
+        pd.to_numeric, errors='coerce'
+    ).fillna(0)
+
+    # 🧮 SOMA AUTOMÁTICA
     df_editado[col_total] = df_editado[cols_para_somar].sum(axis=1)
 
-    # 3. Conferência e Ranking
+    # 📊 PROGRESSO DA TURMA
     st.divider()
-    st.subheader("🏆 2. Ranking Atualizado (Confirme se somou)")
-    
+    st.subheader("📈 Progresso da Turma")
+
+    total_geral = df_editado[col_total].sum()
+    maximo = len(df_editado) * 100  # ajuste se quiser
+
+    progresso = total_geral / maximo if maximo > 0 else 0
+
+    st.progress(progresso)
+    st.write(f"XP Total da Turma: **{int(total_geral)}**")
+
+    # 🏆 RANKING
+    st.divider()
+    st.subheader("🏆 Ranking dos Alunos")
+
     ranking = df_editado[[col_nome, col_total]].copy()
-    ranking = ranking.sort_values(by=col_total, ascending=False)
-    
-    # Mostra o resultado na tela antes de salvar
+    ranking = ranking.sort_values(by=col_total, ascending=False).reset_index(drop=True)
+
+    # 🥇🥈🥉 medalhas
+    medalhas = ["🥇", "🥈", "🥉"]
+
+    def get_medalha(i):
+        return medalhas[i] if i < 3 else ""
+
+    ranking["Posição"] = ranking.index + 1
+    ranking["🏅"] = ranking.index.map(get_medalha)
+
+    ranking = ranking[["Posição", "🏅", col_nome, col_total]]
+
     st.dataframe(ranking, use_container_width=True, hide_index=True)
 
-    # 4. Botão Salvar
-    if st.button("💾 3. SALVAR E ENVIAR PARA O GOOGLE"):
-        conn.update(spreadsheet=url, data=df_editado)
-        st.success("Somas calculadas e enviadas!")
+    # 💾 SALVAR AUTOMÁTICO
+    st.divider()
+
+    if st.button("💾 SALVAR NO GOOGLE"):
+        conn.update(
+            spreadsheet=SPREADSHEET_ID,
+            worksheet=ABA,
+            data=df_editado
+        )
+        st.success("Dados salvos com sucesso!")
         st.balloons()
 
 except Exception as e:
