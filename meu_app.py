@@ -9,54 +9,54 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Lendo os dados (pulando as 7 linhas iniciais)
+    # 1. Lê a planilha e força a limpeza de dados
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')].copy()
     
-    # Preenche vazios com 0 para não dar erro no editor numérico
+    # Preenche vazios com 0 para evitar erro de sistema
     df = df.fillna(0)
 
-    # --- CONFIGURAÇÃO DE SEGURANÇA ---
-    # Aqui a gente separa: Quem é texto e quem é número
-    colunas = df.columns.tolist()
-    nome_col_aluno = colunas[0] # A primeira coluna (Alunos)
-    col_total = colunas[-1]     # A última coluna (Total XP)
-    cols_notas = colunas[1:-1]  # Todas as do meio (Missões)
+    # 2. Mapeamento das colunas para o cadeado de segurança
+    cols = df.columns.tolist()
+    # Identificamos as colunas por nome ou posição
+    col_num = cols[0]   # Número
+    col_aluno = cols[1] # ALUNOS
+    col_total = cols[-1] # TOTAL (XP)
+    cols_notas = cols[2:-1] # Missões
 
     st.subheader("📋 Painel de Lançamento")
-    
-    # 2. O Editor com "Cadeado" por coluna
+
+    # 3. O Editor com os tipos de dados corrigidos
     df_editado = st.data_editor(
         df,
         use_container_width=True,
         hide_index=True,
         num_rows="dynamic",
         column_config={
-            # COLUNA DE ALUNOS: Permite letras (Texto)
-            nome_col_aluno: st.column_config.TextColumn("ALUNOS", required=True),
-            # COLUNAS DE NOTAS: Só permitem números (Number)
-            **{c: st.column_config.NumberColumn(c, min_value=0, format="%d") for c in cols_notas},
-            # COLUNA TOTAL: Protegida (Apenas leitura)
-            col_total: st.column_config.NumberColumn(col_total, disabled=True, format="%d")
+            col_num: st.column_config.NumberColumn("Nº", disabled=True),
+            col_aluno: st.column_config.TextColumn("ALUNOS", required=True),
+            col_total: st.column_config.NumberColumn("TOTAL (XP)", disabled=True),
+            # Todas as outras colunas são configuradas como NUMÉRICAS
+            **{c: st.column_config.NumberColumn(c, min_value=0) for c in cols_notas}
         }
     )
 
-    # 3. Botão de Cálculo (Fórmula L9+H9+G9...)
+    # 4. Botão de Soma (L9+H9+G9...)
     st.divider()
-    if st.button("🚀 CALCULAR E SALVAR NO GOOGLE"):
-        # Garante que tudo nas missões seja número antes de somar
+    if st.button("🚀 CALCULAR E SALVAR"):
+        # Garante que as notas sejam números
         for c in cols_notas:
             df_editado[c] = pd.to_numeric(df_editado[c], errors='coerce').fillna(0)
         
-        # SOMA DAS MISSÕES
+        # Faz a soma horizontal
         df_editado[col_total] = df_editado[cols_notas].sum(axis=1)
 
-        # Envia para o Google Sheets
+        # Envia para o Google
         conn.update(spreadsheet=url, data=df_editado)
-        
-        st.success("✅ Calculado! Agora os números estão protegidos.")
+        st.success("✅ Sistema Destravado! Dados salvos no Google Sheets.")
         st.balloons()
         st.rerun()
 
 except Exception as e:
-    st.error(f"Erro na tabela: {e}")
+    st.error(f"Erro técnico detectado: {e}")
+    st.info("Dica: Verifique se os nomes das colunas na Planilha são exatamente iguais aos do App.")
