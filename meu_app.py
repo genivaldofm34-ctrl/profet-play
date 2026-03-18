@@ -9,45 +9,59 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Lendo os dados e limpando o 'None' imediatamente
+    # 1. Lendo os dados brutos
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
-    df = df.fillna(0)
     
-    # Remove colunas vazias fantasmas
+    # 2. Limpeza Total de 'None' e Colunas Fantasmas
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     if "Número" in df.columns:
         df = df.drop(columns=["Número"])
-
-    # 2. Garante que a coluna de Alunos aceite texto (limpa o 0 que o fillna coloca)
+    
+    # Troca o 'None' por 0 nos números e texto vazio nos alunos
+    df = df.fillna(0)
     if "ALUNOS" in df.columns:
-        df["ALUNOS"] = df["ALUNOS"].astype(str).replace("0", "").replace("0.0", "")
+        df["ALUNOS"] = df["ALUNOS"].astype(str).replace(["0", "0.0"], "")
 
     st.subheader("📋 Painel de Lançamento")
     
-    # 3. Editor de dados - Aqui você lança as notas
-    df_editado = st.data_editor(df, use_container_width=True, hide_index=True)
+    # 3. O Editor de Dados
+    # O segredo: ele agora mostra a tabela e permite editar
+    df_editado = st.data_editor(
+        df, 
+        use_container_width=True, 
+        hide_index=True,
+        num_rows="dynamic"
+    )
 
-    # --- MOTOR DE CÁLCULO REAL ---
-    # Pegamos apenas as colunas que são de notas (Níveis, Extras, etc)
-    # Ignoramos ALUNOS e as colunas de resultado final
-    cols_para_somar = [c for c in df_editado.columns if c not in ["ALUNOS", "TOTAL (XP)", "TOTAL", "ANTERIOR", "DIFERENÇA"]]
+    # --- MOTOR DE SOMA ---
+    # Pegamos todas as colunas que PODEM ter números (Níveis, Extras, etc)
+    # Ignoramos apenas a coluna 'ALUNOS'
+    cols_para_somar = [c for c in df_editado.columns if "ALUNO" not in c.upper() and "TOTAL" not in c.upper()]
     
-    # Converte tudo para número (se houver texto no meio, vira 0)
+    # Converte para número e calcula o TOTAL (XP)
     for col in cols_para_somar:
         df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
     
-    # A SOMA ACONTECE AQUI
+    # Força a soma na coluna TOTAL (XP)
     df_editado["TOTAL (XP)"] = df_editado[cols_para_somar].sum(axis=1)
 
-    # Mostra o Ranking atualizado abaixo para conferência
+    # 4. Exibição do Ranking (Onde você confirma a soma)
     st.divider()
-    st.write("### 🏆 Ranking em Tempo Real")
-    ranking = df_editado[["ALUNOS", "TOTAL (XP)"]].sort_values(by="TOTAL (XP)", ascending=False)
-    st.table(ranking) # Usando table para visualização mais fixa
+    st.subheader("🏆 Ranking dos Ninjas")
+    
+    # Criamos uma tabela de ranking que ordena do maior para o menor
+    ranking = df_editado[["ALUNOS", "TOTAL (XP)"]].copy()
+    ranking = ranking.sort_values(by="TOTAL (XP)", ascending=False)
+    
+    # Exibe o ranking com cores
+    st.dataframe(ranking, use_container_width=True, hide_index=True)
 
-    if st.button("💾 SALVAR E CALCULAR"):
+    # 5. Botão de Salvar
+    if st.button("💾 SALVAR E SINCRONIZAR"):
+        # Antes de salvar, garantimos que a coluna ALUNOS não tenha zeros chatos
+        df_editado["ALUNOS"] = df_editado["ALUNOS"].replace("0", "")
         conn.update(spreadsheet=url, data=df_editado)
-        st.success("Tabela somada e salva com sucesso!")
+        st.success("Tudo somado e salvo com sucesso!")
         st.balloons()
 
 except Exception as e:
