@@ -1,29 +1,32 @@
 import streamlit as st
+from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-st.set_page_config(page_title="PROFET PLAY", layout="wide")
+st.set_page_config(page_title="PROFET PLAY - EDITOR", layout="centered")
 
-st.title("🎮 PROFET PLAY MOBILE")
+st.title("🎮 PROFET PLAY - SISTEMA ATIVO")
 
-# Cole o link da sua planilha aqui dentro das aspas
-URL = "https://docs.google.com/spreadsheets/d/1GACvXoUFoUeC8Nbft6JGTzPOLID-MzOD/edit?usp=drivesdk&ouid=101791929152850022807&rtpof=true&sd=true"
+# Link da sua planilha (verifique se ela permite edição)
+url = "https://docs.google.com/spreadsheets/d/1GACvXoUFoUeC8Nbft6JGTzPOLID-MzOD/edit?usp=sharing&ouid=101791929152850022807&rtpof=true&sd=true"
+
+# Cria a conexão com o Google Sheets
+conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # Transforma o link para leitura
-    csv_url = URL.replace('/edit?usp=sharing', '/export?format=csv')
+    # Lê os dados pulando as linhas iniciais se necessário
+    df = conn.read(spreadsheet=url, skiprows=7)
     
-    # Lê a planilha pulando o cabeçalho (7 linhas)
-    df = pd.read_csv(csv_url, skiprows=7)
+    st.write("### 📝 Edite as notas e clique em Salvar")
     
-    st.write("### 👥 Lista de Alunos")
-    
-    # Criar a tabela que você pode tocar e editar no iPhone
-    # Se o requirements.txt estiver certo, esse comando vai funcionar!
-    df_editado = st.data_editor(df, hide_index=True)
+    # Área de edição
+    df_editado = st.data_editor(df)
 
-    if st.button("💾 SALVAR ALTERAÇÕES"):
-        st.success("Alterações registradas!")
+    if st.button("💾 SALVAR NA PLANILHA"):
+        # Envia as alterações de volta para a nuvem
+        conn.update(spreadsheet=url, data=df_editado)
+        st.success("Planilha atualizada com sucesso!")
         st.balloons()
 
 except Exception as e:
-    st.warning("O sistema está carregando as ferramentas. Aguarde 1 minuto e atualize a página.")
+    st.error(f"Erro de conexão: {e}")
+    st.info("Dica: Verifique se o link da planilha está correto e se o arquivo requirements.txt já foi processado pelo servidor.")
