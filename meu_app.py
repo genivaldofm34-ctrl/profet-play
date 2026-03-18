@@ -9,16 +9,12 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Busca os dados
+    # 1. Busca os dados e limpa o básico
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
-    
-    # 2. Limpeza total (Tira o 'None' e colunas fantasmas)
     df = df.fillna(0)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-    if "Número" in df.columns:
-        df = df.drop(columns=["Número"])
 
-    # Garante que a coluna de Alunos aceite texto
+    # 2. Garante que a coluna de Alunos seja texto
     if "ALUNOS" in df.columns:
         df["ALUNOS"] = df["ALUNOS"].astype(str).replace(["0", "0.0"], "")
 
@@ -32,30 +28,34 @@ try:
         num_rows="dynamic"
     )
 
-    # --- MOTOR DE CÁLCULO (A SOMA VIVA) ---
-    # Pegamos todas as colunas que NÃO são texto e NÃO são resultados
-    cols_ignorar = ["ALUNOS", "TOTAL (XP)", "TOTAL", "ANTERIOR", "DIFERENÇA"]
-    cols_soma = [c for c in df_editado.columns if c not in cols_ignorar]
+    # --- MOTOR DE SOMA "FORÇA BRUTA" ---
+    # Pegamos todas as colunas que são números reais
+    for col in df_editado.columns:
+        if col != "ALUNOS":
+            df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
     
-    # Converte para número e soma
-    for col in cols_soma:
-        df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
-    
-    # Calcula o Total na hora
-    df_editado["TOTAL (XP)"] = df_editado[cols_soma].sum(axis=1)
+    # Identifica qual coluna é o TOTAL (independente de como está escrita)
+    col_total = [c for c in df_editado.columns if "TOTAL" in c.upper()]
+    # Identifica as colunas de missões (tudo que não é ALUNO nem TOTAL)
+    col_missoes = [c for c in df_editado.columns if c != "ALUNOS" and c not in col_total]
 
-    # 4. Ranking (Onde você confirma se somou)
+    if col_total:
+        # Faz a soma de todas as missões e joga no Total
+        df_editado[col_total[0]] = df_editado[col_missoes].sum(axis=1)
+
+    # 4. RANKING VISÍVEL (Para você ter certeza que somou)
     st.divider()
-    st.subheader("🏆 Ranking em Tempo Real")
-    ranking = df_editado[["ALUNOS", "TOTAL (XP)"]].copy()
-    ranking = ranking.sort_values(by="TOTAL (XP)", ascending=False)
-    st.dataframe(ranking, use_container_width=True, hide_index=True)
+    st.subheader("🏆 Ranking dos Ninjas")
+    if col_total:
+        ranking = df_editado[["ALUNOS", col_total[0]]].copy()
+        ranking = ranking.sort_values(by=col_total[0], ascending=False)
+        st.dataframe(ranking, use_container_width=True, hide_index=True)
 
     # 5. Salvar
-    if st.button("💾 SALVAR E ATUALIZAR"):
+    if st.button("💾 SALVAR TUDO"):
         conn.update(spreadsheet=url, data=df_editado)
-        st.success("Dados salvos com sucesso!")
+        st.success("Soma realizada e salva com sucesso!")
         st.balloons()
 
 except Exception as e:
-    st.error(f"Erro no código: {e}")
+    st.error(f"Erro no sistema: {e}")
