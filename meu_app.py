@@ -9,51 +9,51 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Leitura dos dados (pula as 7 linhas iniciais)
+    # 1. LEITURA DOS DADOS
+    # Pula as 7 linhas iniciais. ttl=0 garante que pegue sempre o dado mais novo.
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
     
-    # Limpeza básica
+    # Limpa colunas sem nome (fantasmas)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')].copy()
-    df = df.fillna(0)
-
-    # Garante que a primeira coluna seja texto (para os nomes que você já destravou)
-    df.iloc[:, 0] = df.iloc[:, 0].astype(str).replace(["0", "0.0", "nan", "None"], "")
+    
+    # Preenche os vazios com algo neutro para não travar o editor
+    df = df.fillna("")
 
     st.subheader("📋 Painel de Lançamento")
-    
-    # 2. O Editor de Dados
+    st.info("💡 Digite os nomes e as notas. Depois, clique no botão lá embaixo para calcular.")
+
+    # 2. EDITOR DE DADOS TOTALMENTE LIBERADO
+    # Removemos as configurações rígidas de coluna para o navegador não bloquear nada
     df_editado = st.data_editor(
         df,
         use_container_width=True,
         hide_index=True,
-        num_rows="dynamic",
-        key="editor_v3"
+        num_rows="dynamic" # Permite inserir novos alunos
     )
 
-    # --- O MOTOR DA SOMA (Fórmula das Linhas) ---
-    # Pegamos todas as colunas de missões (entre o nome e o total)
-    cols = df_editado.columns.tolist()
-    col_nome = cols[0]
-    col_total = cols[-1] # Assume que TOTAL (XP) é a última
-    cols_para_somar = cols[1:-1] # Tudo o que for nota no meio
-
-    # 3. O Botão que aciona a matemática
+    # 3. O BOTÃO QUE FAZ A MÁGICA
     st.divider()
-    if st.button("🚀 CALCULAR XP E SALVAR NO GOOGLE"):
-        # Converte tudo que é nota para número real
-        for col in cols_para_somar:
+    if st.button("🚀 CALCULAR E SALVAR NO GOOGLE"):
+        # Pegamos as posições das colunas
+        cols = df_editado.columns.tolist()
+        col_nome = cols[0]
+        col_total = cols[-1] # Assume que TOTAL (XP) é a última coluna à direita
+        cols_missoes = cols[1:-1] # Tudo que está no meio
+
+        # Faz a conversão apenas agora, na hora de calcular
+        for col in cols_missoes:
             df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
         
-        # AQUI É A SOMA: Ele soma a linha inteira e joga na última coluna
-        df_editado[col_total] = df_editado[cols_para_somar].sum(axis=1)
+        # A FÓRMULA DE SOMA (Soma as missões de cada linha)
+        df_editado[col_total] = df_editado[cols_missoes].sum(axis=1)
 
-        # Envia para o Google Sheets
+        # Envia de volta para o Google Sheets
         conn.update(spreadsheet=url, data=df_editado)
         
-        st.success("✅ CÁLCULO REALIZADO! Os totais foram atualizados na planilha.")
+        st.success("✅ SOMA REALIZADA! Os dados foram enviados com sucesso.")
         st.balloons()
         
-        # Mostra o Ranking para você ver que funcionou
+        # Mostra o ranking atualizado
         st.subheader("🏆 Ranking Atualizado")
         ranking = df_editado[[col_nome, col_total]].sort_values(by=col_total, ascending=False)
         st.table(ranking)
