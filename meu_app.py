@@ -9,47 +9,49 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Leitura
+    # 1. Leitura dos dados
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
-    df = df.fillna(0)
-    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
     
-    # Limpa nomes
-    if "ALUNOS" in df.columns:
-        df["ALUNOS"] = df["ALUNOS"].astype(str).replace(["0", "0.0", "None"], "")
+    # Limpeza de colunas vazias que o Sheets as vezes envia
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+    df = df.fillna(0)
 
-    # 2. Uso de FORM para garantir que os dados sejam processados
-    with st.form("meu_formulario"):
-        st.subheader("📋 1. Lance as Notas e Aperte 'CALCULAR'")
-        df_editado = st.data_editor(df, use_container_width=True, hide_index=True)
-        
-        botao_calcular = st.form_submit_button("🧮 CALCULAR SOMA E VER RANKING")
+    st.subheader("📋 1. Lance os Dados na Tabela")
+    
+    # 2. Editor de dados
+    df_editado = st.data_editor(df, use_container_width=True, hide_index=True)
 
-    # 3. O Cálculo só acontece se o botão for clicado
-    if botao_calcular:
-        # Identifica colunas de notas
-        cols_ignorar = ["ALUNOS", "TOTAL (XP)", "TOTAL", "ANTERIOR", "DIFERENÇA"]
-        cols_missoes = [c for c in df_editado.columns if c not in cols_ignorar]
+    # --- MOTOR DE SOMA POR POSIÇÃO (SEM ERRO DE NOME) ---
+    # Pegamos todas as colunas exceto a primeira (nome) e a última (total)
+    todas_cols = df_editado.columns.tolist()
+    col_nome = todas_cols[0]
+    col_total = todas_cols[-1]
+    cols_para_somar = todas_cols[1:-1] # Tudo que está no "meio"
 
-        # Converte e Soma
-        for col in cols_missoes:
-            df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
-        
-        # Faz a soma real
-        df_editado["TOTAL (XP)"] = df_editado[cols_missoes].sum(axis=1)
+    # Forçamos a soma
+    for col in cols_para_somar:
+        df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
+    
+    # A MÁGICA: Soma tudo e joga na última coluna
+    df_editado[col_total] = df_editado[cols_para_somar].sum(axis=1)
 
-        st.success("✅ Soma calculada com sucesso!")
-        
-        # Mostra o Ranking para conferir
-        st.subheader("🏆 Ranking Atualizado")
-        ranking = df_editado[["ALUNOS", "TOTAL (XP)"]].sort_values(by="TOTAL (XP)", ascending=False)
-        st.dataframe(ranking, use_container_width=True, hide_index=True)
+    st.divider()
+    st.subheader("📊 2. Ranking de XP (Confirmação)")
+    
+    # Mostra o ranking baseado na última coluna da sua planilha
+    ranking = df_editado[[col_nome, col_total]].copy()
+    ranking = ranking.sort_values(by=col_total, ascending=False)
+    
+    # Formatação para o nome do aluno aparecer como texto
+    ranking[col_nome] = ranking[col_nome].astype(str).replace(["0", "0.0"], "")
+    
+    st.dataframe(ranking, use_container_width=True, hide_index=True)
 
-        # Botão para salvar de verdade no Google
-        if st.button("💾 SALVAR DEFINITIVAMENTE NO GOOGLE"):
-            conn.update(spreadsheet=url, data=df_editado)
-            st.success("Planilha atualizada!")
-            st.balloons()
+    # 3. Botão de Salvar
+    if st.button("💾 SALVAR TUDO"):
+        conn.update(spreadsheet=url, data=df_editado)
+        st.success(f"Somado com sucesso na coluna {col_total}!")
+        st.balloons()
 
 except Exception as e:
-    st.error(f"Erro: {e}")
+    st.error(f"Erro Crítico: {e}")
