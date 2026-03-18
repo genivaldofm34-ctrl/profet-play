@@ -9,55 +9,52 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Leitura e Limpeza de Cabeçalho
+    # 1. Busca os dados e pula o cabeçalho
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
+    
+    # 2. LIMPEZA TOTAL (Isso evita as células vermelhas)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')].copy()
-
-    # --- DESTRAVA TOTAL ---
-    # Remove os "None", "nan" e "0.0" que estão bloqueando as células
+    
+    # Transformamos tudo em "vazio" onde tem 0 ou erro, para o campo ficar limpo
     df = df.astype(str).replace(["None", "nan", "0.0", "0,0", "0"], "")
 
     st.subheader("📋 Painel de Lançamento")
-    st.info("💡 Digite os nomes e notas. Se a célula estiver vazia, basta clicar e digitar.")
-
-    # 2. Editor de Dados (Liberado para Inserção)
+    
+    # 3. EDITOR DE DADOS (Configurado para aceitar qualquer entrada)
     df_editado = st.data_editor(
         df,
         use_container_width=True,
         hide_index=True,
-        num_rows="dynamic" # Permite adicionar novos alunos na última linha
+        num_rows="dynamic",
+        key="editor_final"
     )
 
-    # 3. Botão de Processamento
+    # 4. BOTÃO DE CÁLCULO E SALVAMENTO
     st.divider()
-    if st.button("🚀 CALCULAR XP E ATUALIZAR GOOGLE"):
-        # Identifica as colunas para a conta
+    if st.button("🚀 CALCULAR XP E ATUALIZAR PLANILHA"):
+        # Mapeia as colunas
         cols = df_editado.columns.tolist()
-        col_nome = cols[0]
         col_total = "TOTAL (XP)" if "TOTAL (XP)" in cols else cols[-1]
         
-        # Colunas de missões são tudo o que está entre o nome e o total
-        idx_nome = 0
-        idx_total = cols.index(col_total)
-        cols_missoes = cols[idx_nome + 1 : idx_total]
-
-        # Converte para número apenas na hora de somar
-        for col in cols_missoes:
-            df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
+        # O que não for ALUNOS ou o TOTAL, vira número para somar
+        for col in cols:
+            if col != cols[0] and col != col_total:
+                df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
         
-        # Faz a soma horizontal (A fórmula da sua planilha)
-        df_editado[col_total] = df_editado[cols_missoes].sum(axis=1)
+        # A SOMA: (L9+H9+G9...) conforme seu print da planilha
+        # Soma todas as colunas de missões linha por linha
+        df_editado[col_total] = df_editado.drop(columns=[cols[0], col_total]).sum(axis=1)
 
-        # Salva no Google Sheets
+        # 5. Manda para o Google Sheets
         conn.update(spreadsheet=url, data=df_editado)
         
-        st.success("✅ Tudo somado e salvo com sucesso!")
+        st.success("✅ Sistema atualizado! O total foi calculado.")
         st.balloons()
         
-        # Mostra o Ranking Real
+        # Mostra o Ranking Realizado
         st.subheader("🏆 Ranking de XP")
-        ranking = df_editado[[col_nome, col_total]].sort_values(by=col_total, ascending=False)
+        ranking = df_editado[[cols[0], col_total]].sort_values(by=col_total, ascending=False)
         st.table(ranking)
 
 except Exception as e:
-    st.error(f"Erro ao carregar dados: {e}")
+    st.error(f"Erro ao processar: {e}")
