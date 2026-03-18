@@ -9,49 +9,52 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Busca os dados brutos
-    df_raw = conn.read(spreadsheet=url, skiprows=7, ttl=0)
-    df = df_raw.loc[:, ~df_raw.columns.str.contains('^Unnamed')].copy()
-
-    # --- DESTRAVA OS TIPOS DE DADOS (Resolve o erro das imagens) ---
-    # Forçamos a coluna ALUNOS a aceitar texto (JJ, Nomes, etc)
-    if len(df.columns) > 1:
-        df.iloc[:, 1] = df.iloc[:, 1].astype(str).replace(["0", "0.0", "nan", "None"], "")
+    # 1. Leitura dos dados pulando o cabeçalho
+    df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')].copy()
     
-    # Forçamos as colunas de missões a serem numéricas
+    # Limpeza para garantir que o editor aceite os dados
+    df.iloc[:, 1] = df.iloc[:, 1].astype(str).replace(["0", "0.0", "nan", "None"], "")
     for c in df.columns[2:]:
         df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
 
     st.subheader("📋 Painel de Lançamento")
-
-    # 2. O Editor com configuração manual (evita o conflito com o Sheets)
+    
+    # 2. O Editor de Dados
     df_editado = st.data_editor(
         df,
         use_container_width=True,
         hide_index=True,
-        num_rows="dynamic",
-        column_config={
-            df.columns[0]: st.column_config.NumberColumn("Nº", disabled=True),
-            df.columns[1]: st.column_config.TextColumn("ALUNOS"), # ACEITA LETRAS AQUI
-            df.columns[-1]: st.column_config.NumberColumn("TOTAL (XP)", disabled=True)
-        }
+        num_rows="dynamic"
     )
 
-    # 3. O Botão da Soma (L9+H9+G9...)
+    # 3. O BOTÃO QUE FAZ A SOMA (Igual à sua fórmula do Excel)
     st.divider()
-    if st.button("🚀 CALCULAR E SALVAR"):
+    if st.button("🚀 CALCULAR XP E SALVAR NO GOOGLE"):
         cols = df_editado.columns.tolist()
-        # Soma tudo que está entre o Nome e o Total
-        missões = cols[2:-1]
         
-        # Faz a conta matemática
-        df_editado[cols[-1]] = df_editado[missões].sum(axis=1)
+        # Identificamos a coluna de TOTAL e as colunas de notas
+        # No seu print, o TOTAL (XP) é a coluna 'N' e 'EXTRA' é a 'M'
+        col_total = "TOTAL (XP)"
+        col_extra = "EXTRA"
+        
+        # Selecionamos todas as colunas de Nível e Missões para somar
+        # Ignoramos as colunas de 'Nº', 'ALUNOS', 'TOTAL', 'ANTERIOR' e 'DIFERENÇA'
+        cols_para_somar = [c for c in cols if c not in ["Nº", "Número", "ALUNOS", "TOTAL (XP)", "ANTERIOR", "DIFERENÇA"]]
 
-        # Salva no Google
+        # Realiza a soma horizontal de cada linha
+        df_editado[col_total] = df_editado[cols_para_somar].sum(axis=1)
+
+        # Envia de volta para o Google Sheets
         conn.update(spreadsheet=url, data=df_editado)
-        st.success("✅ Erro resolvido e dados salvos!")
+        
+        st.success("✅ SOMA REALIZADA! O Total XP foi atualizado na planilha.")
         st.balloons()
-        st.rerun()
+        
+        # Mostra o Ranking para confirmar a soma
+        st.subheader("🏆 Ranking Atualizado")
+        ranking = df_editado.iloc[:, [1, cols.index(col_total)]].sort_values(by=col_total, ascending=False)
+        st.table(ranking)
 
 except Exception as e:
     st.error(f"Erro técnico: {e}")
