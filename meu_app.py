@@ -9,59 +9,52 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Lendo os dados
-    if 'df_mestre' not in st.session_state:
-        df_inicial = conn.read(spreadsheet=url, skiprows=7, ttl=0)
-        df_inicial = df_inicial.fillna(0)
-        df_inicial = df_inicial.loc[:, ~df_inicial.columns.str.contains('^Unnamed')]
-        if "Número" in df_inicial.columns:
-            df_inicial = df_inicial.drop(columns=["Número"])
-        st.session_state.df_mestre = df_inicial
-
-    # --- A FÓRMULA DE SOMA ---
-    def calcular_tudo():
-        df = st.session_state.df_mestre
-        # Identifica colunas que são missões (não são nomes nem totais)
-        cols_ignorar = ["ALUNOS", "TOTAL (XP)", "TOTAL", "ANTERIOR", "DIFERENÇA"]
-        cols_missoes = [c for c in df.columns if c not in cols_ignorar]
-        
-        # Converte para número e soma linha por linha
-        for col in cols_missoes:
-            df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
-        
-        # A SOMA QUE VOCÊ PEDIU:
-        df["TOTAL (XP)"] = df[cols_missoes].sum(axis=1)
-        st.session_state.df_mestre = df
-
-    st.subheader("📋 Painel de Lançamento")
+    # 1. Lendo os dados (começando da linha 8 onde estão os cabeçalhos)
+    df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
+    df = df.fillna(0)
     
-    # 2. Editor de dados com gatilho de cálculo
+    # Limpeza de colunas extras
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+
+    st.subheader("📋 Painel de Lançamento de XP")
+    
+    # 2. Editor de dados
     df_editado = st.data_editor(
-        st.session_state.df_mestre, 
+        df, 
         use_container_width=True, 
         hide_index=True,
-        num_rows="dynamic",
-        key="meu_editor"
+        num_rows="dynamic"
     )
 
-    # Botão para forçar a soma aparecer na tela
-    if st.button("🧮 ATUALIZAR SOMAS"):
-        st.session_state.df_mestre = df_editado
-        calcular_tudo()
+    # --- A FÓRMULA QUE VOCÊ QUER (IGUAL AO SHEETS) ---
+    # Colunas que entram na soma de XP:
+    cols_missoes = [
+        "Nível 1 (20 XP)", "Nível 2 (30 XP)", "Nível 3 (20 XP)", 
+        "Nível 4 (10 XP)", "Nível 5 (20 XP)", "Guardião do silêncio (15 XP)",
+        "Monitor de missões (15 XP)", "Lenda da semana (5 XP)",
+        "Melhor companheiro (5 XP)", "Superação da semana (5 XP)", 
+        "EXTRA", "ANTERIOR"
+    ]
+
+    # Verificamos quais dessas colunas realmente existem na tabela para não dar erro
+    cols_presentes = [c for c in cols_missoes if c in df_editado.columns]
+
+    # Convertemos para número e aplicamos a soma linha por linha
+    for col in cols_presentes:
+        df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
+    
+    # O TOTAL XP agora recebe a soma exata de todas as missões + o anterior
+    if "TOTAL (XP)" in df_editado.columns:
+        df_editado["TOTAL (XP)"] = df_editado[cols_presentes].sum(axis=1)
+
+    # 3. Botão Salvar e Calcular
+    st.divider()
+    if st.button("💾 ATUALIZAR SOMAS E SALVAR NO GOOGLE"):
+        # Envia os dados já somados pelo Python para a planilha
+        conn.update(spreadsheet=url, data=df_editado)
+        st.success("Soma realizada! A planilha ganhou vida.")
+        st.balloons()
         st.rerun()
 
-    # 3. Ranking Automático
-    st.divider()
-    st.subheader("🏆 Ranking dos Ninjas")
-    ranking = st.session_state.df_mestre[["ALUNOS", "TOTAL (XP)"]].copy()
-    ranking = ranking.sort_values(by="TOTAL (XP)", ascending=False)
-    st.dataframe(ranking, use_container_width=True, hide_index=True)
-
-    # 4. Botão Salvar
-    if st.button("💾 SALVAR TUDO NO GOOGLE"):
-        conn.update(spreadsheet=url, data=st.session_state.df_mestre)
-        st.success("Somas salvas com sucesso!")
-        st.balloons()
-
 except Exception as e:
-    st.error(f"Erro: {e}")
+    st.error(f"Erro ao processar as colunas: {e}")
