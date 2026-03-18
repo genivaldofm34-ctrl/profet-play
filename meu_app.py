@@ -9,52 +9,45 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. Busca os dados e limpa o básico
+    # 1. Leitura e Limpeza
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
     df = df.fillna(0)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-
-    # 2. Garante que a coluna de Alunos seja texto
+    
     if "ALUNOS" in df.columns:
-        df["ALUNOS"] = df["ALUNOS"].astype(str).replace(["0", "0.0"], "")
+        df["ALUNOS"] = df["ALUNOS"].astype(str).replace(["0", "0.0", "None"], "")
 
-    st.subheader("📋 Painel de Lançamento")
-    
-    # 3. Editor de dados
-    df_editado = st.data_editor(
-        df, 
-        use_container_width=True, 
-        hide_index=True,
-        num_rows="dynamic"
-    )
+    st.subheader("📋 1. Lance as Notas Abaixo")
+    # O editor serve apenas para entrada de dados
+    df_editado = st.data_editor(df, use_container_width=True, hide_index=True)
 
-    # --- MOTOR DE SOMA "FORÇA BRUTA" ---
-    # Pegamos todas as colunas que são números reais
-    for col in df_editado.columns:
-        if col != "ALUNOS":
-            df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
-    
-    # Identifica qual coluna é o TOTAL (independente de como está escrita)
-    col_total = [c for c in df_editado.columns if "TOTAL" in c.upper()]
-    # Identifica as colunas de missões (tudo que não é ALUNO nem TOTAL)
-    col_missoes = [c for c in df_editado.columns if c != "ALUNOS" and c not in col_total]
+    # --- CÁLCULO MANUAL FORÇADO ---
+    # Identificamos as colunas de missões (que não são nomes nem totais)
+    cols_ignorar = ["ALUNOS", "TOTAL (XP)", "TOTAL", "ANTERIOR", "DIFERENÇA"]
+    cols_missoes = [c for c in df_editado.columns if c not in cols_ignorar]
 
-    if col_total:
-        # Faz a soma de todas as missões e joga no Total
-        df_editado[col_total[0]] = df_editado[col_missoes].sum(axis=1)
+    # Convertendo tudo para número para garantir a conta
+    for col in cols_missoes:
+        df_editado[col] = pd.to_numeric(df_editado[col], errors='coerce').fillna(0)
 
-    # 4. RANKING VISÍVEL (Para você ter certeza que somou)
+    # Calculando a soma
+    df_editado["TOTAL (XP)"] = df_editado[cols_missoes].sum(axis=1)
+
     st.divider()
-    st.subheader("🏆 Ranking dos Ninjas")
-    if col_total:
-        ranking = df_editado[["ALUNOS", col_total[0]]].copy()
-        ranking = ranking.sort_values(by=col_total[0], ascending=False)
-        st.dataframe(ranking, use_container_width=True, hide_index=True)
+    st.subheader("📊 2. Confira a Soma e o Ranking")
+    
+    # Criamos uma tabela de conferência que mostra o nome e o total calculado
+    conferencia = df_editado[["ALUNOS", "TOTAL (XP)"]].copy()
+    conferencia = conferencia.sort_values(by="TOTAL (XP)", ascending=False)
+    
+    # EXIBE A SOMA AQUI (Se aqui estiver somando, o problema está resolvido!)
+    st.dataframe(conferencia, use_container_width=True, hide_index=True)
 
-    # 5. Salvar
-    if st.button("💾 SALVAR TUDO"):
+    if st.button("💾 3. SALVAR TUDO NA PLANILHA"):
+        # Garante que a coluna de texto não vá com zeros
+        df_editado["ALUNOS"] = df_editado["ALUNOS"].replace("0", "")
         conn.update(spreadsheet=url, data=df_editado)
-        st.success("Soma realizada e salva com sucesso!")
+        st.success("Dados enviados com sucesso!")
         st.balloons()
 
 except Exception as e:
