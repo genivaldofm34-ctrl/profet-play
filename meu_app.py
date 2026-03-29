@@ -2,7 +2,7 @@ import streamlit as st
 from streamlit_gsheets import GSheetsConnection
 import pandas as pd
 
-# CONFIGURAÇÃO DA PÁGINA
+# CONFIGURAÇÃO DA PÁGINA - NOME ATUALIZADO
 st.set_page_config(page_title="PROF PLAY", layout="wide")
 st.title("🎮 PROF PLAY - SISTEMA ATIVO")
 
@@ -11,22 +11,21 @@ url = "https://docs.google.com/spreadsheets/d/1BZi169dylkYOOqdwserIbYJ-w-ZOZXBQ0
 conn = st.connection("gsheets", type=GSheetsConnection)
 
 try:
-    # 1. LEITURA DOS DADOS (Pulando as 7 linhas de cabeçalho do seu modelo)
+    # 1. LEITURA DOS DADOS
+    # skiprows=7 pula o cabeçalho decorativo da sua planilha
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
     
-    # Remove colunas vazias que o pandas às vezes cria (Unnamed)
+    # Limpa colunas vazias
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')].copy()
     
-    # 2. LIMPEZA E FORMATAÇÃO
-    # Garante que as colunas de pontos sejam tratadas como números para a soma funcionar
+    # 2. TRATAMENTO DE DADOS (Transforma tudo que não é nome em número)
     for c in df.columns:
-        if c not in ["ALUNOS", "Nº", "Número"]:
+        if c not in ["ALUNOS", "ALUNO", "Nº", "Número", "NOME"]:
             df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
 
-    st.subheader("📋 Painel de Lançamento de Notas")
-    st.info("💡 Dica: Altere os valores na tabela abaixo e depois clique no botão no final da página para calcular e salvar.")
+    st.subheader("📋 Painel de Lançamento - PROF PLAY")
     
-    # 3. O EDITOR DE DADOS (Onde você digita as notas)
+    # 3. EDITOR DE DADOS
     df_editado = st.data_editor(
         df,
         use_container_width=True,
@@ -36,35 +35,35 @@ try:
 
     st.divider()
 
-    # 4. O BOTÃO DE CÁLCULO E SALVAMENTO
+    # 4. BOTÃO DE CÁLCULO E SALVAMENTO
     if st.button("🚀 CALCULAR XP E SALVAR NO GOOGLE"):
-        with st.spinner("Processando cálculos e atualizando Google Sheets..."):
+        with st.spinner("Calculando e enviando para o Google Sheets..."):
             col_total = "TOTAL (XP)"
             
-            # LÓGICA DE SOMA INTELIGENTE:
-            # Pegamos todas as colunas que possuem números
+            # Identifica as colunas de números
             colunas_numericas = df_editado.select_dtypes(include=['number']).columns.tolist()
             
-            # Lista de colunas que NÃO devem entrar na soma do XP total
-            # Adicione aqui qualquer outra coluna que você não queira somar
+            # Colunas que NÃO devem ser somadas no Total
             cols_ignoradas = [col_total, "Nº", "Número", "ANTERIOR", "DIFERENÇA"]
-            
-            # Filtramos para sobrar apenas as Missões/Extras
             cols_para_somar = [c for c in colunas_numericas if c not in cols_ignoradas]
             
-            # Executa a soma horizontal (linha por linha)
+            # Faz a soma horizontal
             df_editado[col_total] = df_editado[cols_para_somar].sum(axis=1)
 
-            # 5. ENVIA OS DADOS DE VOLTA PARA O GOOGLE SHEETS
+            # 5. ATUALIZA A PLANILHA (PRECISA SER 'EDITOR' NO COMPARTILHAMENTO)
             conn.update(spreadsheet=url, data=df_editado)
             
-            st.success(f"✅ SUCESSO! Somamos {len(cols_para_somar)} colunas de atividades.")
+            st.success(f"✅ SOMA CONCLUÍDA! {len(cols_para_somar)} colunas de atividades somadas.")
             st.balloons()
             
-            # EXIBE UM RANKING RÁPIDO PARA CONFERÊNCIA
-            st.subheader("🏆 Top 10 Guardiões (Ranking Atual)")
-            ranking = df_editado[["ALUNOS", col_total]].sort_values(by=col_total, ascending=False).head(10)
+            # 6. RANKING FINAL
+            st.subheader("🏆 Melhores da Semana")
+            # Procura a coluna de nome (pode ser ALUNOS ou ALUNO)
+            col_nome = "ALUNOS" if "ALUNOS" in df_editado.columns else df_editado.columns[1]
+            
+            ranking = df_editado[[col_nome, col_total]].sort_values(by=col_total, ascending=False).head(10)
             st.table(ranking)
 
 except Exception as e:
-    st.error(f"Ocorreu um erro
+    st.error(f"⚠️ Erro no PROF PLAY: {e}")
+    st.info("Dica: Verifique se a sua planilha Google está com acesso de 'Editor' para qualquer pessoa com o link.")
