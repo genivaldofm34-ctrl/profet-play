@@ -13,6 +13,13 @@ try:
     df = conn.read(spreadsheet=url, skiprows=7, ttl=0)
     df = df.loc[:, ~df.columns.str.contains('^Unnamed')].copy()
     
+    # LIMPEZA INICIAL (Troca None por 0 e vírgula por ponto)
+    for c in df.columns:
+        if c not in ["ALUNOS", "Nº", "Número"]:
+            df[c] = df[c].astype(str).replace(['None', 'nan', 'nan '], '0')
+            df[c] = df[c].str.replace(',', '.')
+            df[c] = pd.to_numeric(df[c], errors='coerce').fillna(0)
+
     st.subheader("📋 Painel de Lançamento")
     
     # 2. EDITOR DE DADOS
@@ -25,32 +32,31 @@ try:
 
     st.divider()
 
-    # 3. O BOTÃO DE SOMA FORÇADA
+    # 3. O BOTÃO QUE NÃO ACEITA DESCULPAS (SOMA TUDO)
     if st.button("🚀 CALCULAR XP E SALVAR NO GOOGLE"):
-        with st.spinner("Forçando cálculos..."):
+        with st.spinner("Calculando XP..."):
             col_total = "TOTAL (XP)"
             
-            # LISTA DE COLUNAS QUE NÃO SÃO NOTAS
-            cols_ignoradas = [col_total, "Nº", "Número", "ANTERIOR", "DIFERENÇA", "ALUNOS", "NOME"]
+            # Lista de colunas para ignorar na soma
+            cols_ignoradas = [col_total, "Nº", "Número", "ANTERIOR", "DIFERENÇA", "ALUNOS"]
             
-            # PROCESSO DE "RESSURREIÇÃO":
-            for col in df_editado.columns:
-                if col not in cols_ignoradas:
-                    # Remove espaços, troca vírgula por ponto e força virar número
-                    df_editado[col] = pd.to_numeric(
-                        df_editado[col].astype(str).str.replace(',', '.').str.strip(), 
-                        errors='coerce'
-                    ).fillna(0)
-
-            # AGORA SIM, SOMAMOS TUDO QUE SOBROU
+            # Pega todas as colunas que sobraram e garante que são números
             cols_para_somar = [c for c in df_editado.columns if c not in cols_ignoradas]
+            
+            for c in cols_para_somar:
+                df_editado[c] = pd.to_numeric(df_editado[c], errors='coerce').fillna(0)
+            
+            # FAZ A SOMA LINHA POR LINHA
             df_editado[col_total] = df_editado[cols_para_somar].sum(axis=1)
 
-            # 4. SALVAMENTO
+            # 4. SALVA NO GOOGLE
             conn.update(spreadsheet=url, data=df_editado)
             
-            st.success(f"✅ SOMA REALIZADA! Colunas somadas: {', '.join(cols_para_somar)}")
+            st.success(f"✅ SOMA REALIZADA! Colunas detectadas: {len(cols_para_somar)}")
             st.balloons()
+            
+            # MOSTRA O RANKING PARA CONFIRMAR
+            st.table(df_editado[["ALUNOS", col_total]].sort_values(by=col_total, ascending=False).head(5))
 
 except Exception as e:
-    st.error(f"Erro no PROF PLAY: {e}")
+    st.error(f"Erro: {e}")
