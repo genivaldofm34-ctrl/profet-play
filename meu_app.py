@@ -40,7 +40,16 @@ try:
         
         # Selecionamos todas as colunas de Nível e Missões para somar
         # Ignoramos as colunas de 'Nº', 'ALUNOS', 'TOTAL', 'ANTERIOR' e 'DIFERENÇA'
-        cols_para_somar = [c for c in cols if c not in ["Nº", "Número", "ALUNOS", "TOTAL (XP)", "ANTERIOR", "DIFERENÇA"]]
+      if st.button("🚀 CALCULAR XP E SALVAR NO GOOGLE"):
+        # 1. Selecionamos apenas as colunas que REALMENTE são números (Missões)
+        # Isso evita que o Python tente somar nomes ou textos
+        df_editado[col_total] = df_editado.select_dtypes(include=['number']).drop(columns=[col_total], errors='ignore').sum(axis=1)
+
+        # 2. Envia de volta para o Google Sheets
+        conn.update(spreadsheet=url, data=df_editado)
+        
+        st.success("✅ AGORA FOI! O Total XP foi calculado com sucesso.")
+        st.balloons()
 
         # Realiza a soma horizontal de cada linha
         df_editado[col_total] = df_editado[cols_para_somar].sum(axis=1)
